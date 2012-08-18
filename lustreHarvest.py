@@ -428,7 +428,7 @@ def serverCode( serverName, port ):
             print >>sys.stderr, 'new connection from', client_address
             connection.setblocking(0)
             inputs.append(connection)
-            o[client_address[0]] = {'size':-1}
+            o[str(client_address)] = {'size':-1}
             # any new client appearing or old client disappearing will screw up rates
             first = 1
          else:
@@ -438,7 +438,7 @@ def serverCode( serverName, port ):
                #print >>sys.stderr, 'received "%s" from %s, size %d' % (data, s.getpeername(), len(data))
                #print >>sys.stderr, 'from %s, size %d' % (s.getpeername(), len(data))
 
-               c = s.getpeername()[0]
+               c = str(s.getpeername())
                if o[c]['size'] == -1: # new message
                   #print 'new msg'
                   if len(data) < 128:
