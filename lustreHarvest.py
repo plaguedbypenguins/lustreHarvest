@@ -60,6 +60,7 @@ def spoofIntoGanglia(g, o, name, unit):
    for i, d in o.iteritems():
       # decode ip@lnet to a hostname
       host = getHost(i)
+      ip = i.split('@')[0]
       #print 'ip', ip, 'host', host
       if host == None:
          # if the host is unknown then it could be data for a different cluster. ignore it.
@@ -585,7 +586,7 @@ def clientCode( serverName, port, fsList ):
 
          iNew, now = syncToNextInterval()
          if iNew != (i+1)%clientSend or now - t0 > dt:
-            psrint >>sys.stderr, 'collect took too long', now-t0, 'last interval', i, 'this interval', iNew
+            print >>sys.stderr, 'collect took too long', now-t0, 'last interval', i, 'this interval', iNew
          i = iNew
 
 def usage():
