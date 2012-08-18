@@ -33,8 +33,10 @@ nameMap = { 'data':'vu_short',
 
 statsDir = { 'oss':'/proc/fs/lustre/obdfilter', 'mds':'/proc/fs/lustre/mds' }
 dt = 60.0/clientSend
-hostCache = {}
+verbose = 0
+dryrun = 0
 
+hostCache = {}
 
 def getHost(ip):
    try:
@@ -48,14 +50,14 @@ def getHost(ip):
    return host
 
 def spoofIntoGanglia(g, o, name, unit):
-   if len(o) == 0:
+   if len(o) == 0 or dryrun:
       return
    for i, d in o.iteritems():
       ip = i.split('@')[0]
       host = getHost(ip)
       #print 'ip', ip, 'host', host
       if host == None:
-         print 'unknown host', i, ip
+         print >>sys.stderr, 'unknown host', i, ip
          continue
       spoofStr = ip + ':' + host
       g.send( name, '%.2f' % d, 'float', unit, 'both', 60, 0, "", spoofStr )
@@ -75,7 +77,7 @@ def computeRates( sOld, s, tOld, t ):
       for h in s.keys():
          ds = s[h] - sOld[h]
          if ds < 0:
-            print 'negative rate', h, ds, s[h], sOld[h]
+            print >>sys.stderr, 'negative rate', h, ds, s[h], sOld[h]
             ds = 0
          rates[h] = float(ds)/deltat
       return rates
@@ -85,7 +87,7 @@ def computeRates( sOld, s, tOld, t ):
       if h in sOld.keys():
          ds = s[h] - sOld[h]
          if ds < 0:
-            print 'clients changed. negative rate', h, ds, s[h], sOld[h]
+            print >>sys.stderr, 'clients changed. negative rate', h, ds, s[h], sOld[h]
             ds = 0
          rates[h] = float(ds)/deltat
       else:
@@ -161,10 +163,11 @@ def sumDataToClients(o, t):
       if o[oss]['time'] < tData:
          tData =  o[oss]['time']
       elif  t - o[oss]['time'] > dt:
-         print 'old oss data', oss, 'time',  o[oss]['time'], 'now', t
+         print >>sys.stderr, 'old oss data', oss, 'time',  o[oss]['time'], 'now', t
    #if t - tData > dt:
    #   print 'an ost had stale data by', t-tData
-   print 'stalest data', t - tData
+   if verbose:
+      print 'stalest data', t - tData
 
    # count osts and filesystems
    Nost = 0
@@ -176,9 +179,9 @@ def sumDataToClients(o, t):
             for f in o[oss]['data'].keys():  # filesystems
                Nost += len(o[oss]['data'][f].keys())
          else:
-            print 'no filesystems found on', oss
+            print >>sys.stderr, 'no filesystems found on', oss
       else:
-         print 'data not in oss keys of', oss, 'keys', o[oss].keys()
+         print >>sys.stderr, 'data not in oss keys of', oss, 'keys', o[oss].keys()
    #print 'oss', len(o.keys()), 'ost', Nost
    fss.sort()
    fss = uniq(fss)
@@ -192,9 +195,10 @@ def sumDataToClients(o, t):
    c.sort()
    c = uniq(c)
    c.remove('type')
-   #print 'clients', len(c)
-   print 'oss', len(o.keys()), 'ost', Nost, 'clients', len(c), 'filesystems', fss
-   #print 'client list', time.time() - t
+   if verbose:
+      #print 'clients', len(c)
+      print 'oss', len(o.keys()), 'ost', Nost, 'clients', len(c), 'filesystems', fss
+      #print 'client list', time.time() - t
 
    # make zero'd client lists
    r = {}
@@ -253,10 +257,11 @@ def sumDataToClients(o, t):
                   rTot[f] += rc
                   wTot[f] += wc
                   mdsOpsTot[f] += opsc
-   #print 'c', c
-   for f in fss:
-      print f, 'tot GB r,w, M ops mds,oss', rTot[f]/(1024*1024*1024), wTot[f]/(1024*1024*1024), mdsOpsTot[f]/(1024*1024), ossOpsTot[f]/(1024*1024)
-   print 'client process time', time.time() - t
+   if verbose:
+      #print 'c', c
+      for f in fss:
+         print f, 'tot GB r,w, M ops mds,oss', rTot[f]/(1024*1024*1024), wTot[f]/(1024*1024*1024), mdsOpsTot[f]/(1024*1024), ossOpsTot[f]/(1024*1024)
+      print 'client process time', time.time() - t
 
    # we are only monitoring the mdt for some fs's and in those cases don't
    # want any oss information to get back to servers
@@ -353,9 +358,11 @@ def serverCode( serverName, port ):
              if fss != fssOld:
                 first = 1
              if not first:
-                print 'rate dt', tLast - tOld
+                if verbose:
+                   print 'rate dt', tLast - tOld
                 for f in fss:  # loop over each fs
-                   print 'fs', f
+                   if verbose:
+                      print 'fs', f
                    t = time.time()
                    rRate[f] = computeRates( rOld[f], r[f], tOld, tLast )
                    wRate[f] = computeRates( wOld[f], w[f], tOld, tLast )
@@ -363,23 +370,26 @@ def serverCode( serverName, port ):
                    mdsOpsRate[f] = computeRates( mdsOpsOld[f], mdsOps[f], tOld, tLast )
                    tRate = time.time() - t
                    t = time.time()
-                   #print 'rRate', rRate[f]
-                   #print 'wRate', wRate[f]
-                   #print 'ossOpsRate', ossOpsRate[f]
-                   #print 'mdsOpsRate', mdsOpsRate[f]
-                   printRate('rRate', rRate[f])
-                   printRate('wRate', wRate[f])
-                   printRate('ossOpsRate', ossOpsRate[f])
-                   printRate('mdsOpsRate', mdsOpsRate[f])
+                   if verbose:
+                      #print 'rRate', rRate[f]
+                      #print 'wRate', wRate[f]
+                      #print 'ossOpsRate', ossOpsRate[f]
+                      #print 'mdsOpsRate', mdsOpsRate[f]
+                      printRate('rRate', rRate[f])
+                      printRate('wRate', wRate[f])
+                      printRate('ossOpsRate', ossOpsRate[f])
+                      printRate('mdsOpsRate', mdsOpsRate[f])
 
                    fsGangliaName = nameMap[f]
                    spoofIntoGanglia(g,      rRate[f], fsGangliaName + '_read_bytes',  'bytes/sec')
                    spoofIntoGanglia(g,      wRate[f], fsGangliaName + '_write_bytes', 'bytes/sec')
                    spoofIntoGanglia(g, ossOpsRate[f], fsGangliaName + '_oss_ops',     'ops/sec')
                    spoofIntoGanglia(g, mdsOpsRate[f], fsGangliaName + '_mds_ops',     'ops/sec')
-                   print 'spoof into ganglia time', time.time() - t
+                   if verbose:
+                      print 'spoof into ganglia time', time.time() - t
 
-             print
+             if verbose:
+                print
              tOld = tLast
              first = 0
              processed = 1
@@ -407,14 +417,14 @@ def serverCode( serverName, port ):
                if o[c]['size'] == -1: # new message
                   #print 'new msg'
                   if len(data) < 128:
-                     print 'short header. skipping', c, 'len', len(data)
+                     print >>sys.stderr, 'short header. skipping', c, 'len', len(data)
                      continue
                   try:
                      #     'header ', message length, padding, hash of message body, hash of prev 96 bytes of this header
                      #  len    7         N ~= 6        64-N-7           32                        32
                      hashh = data[96:128]
                      if hashh != md5.new(data[:96]).hexdigest():
-                        print 'corrupted header. skipping. hashes do not match'
+                        print >>sys.stderr, 'corrupted header. skipping. hashes do not match'
                         continue
                      hashb = data[64:96]
                      n = int(data[:64].strip().split()[1])
@@ -424,7 +434,7 @@ def serverCode( serverName, port ):
                      o[c]['msg'] = data[128:]
                      o[c]['cnt'] = len(o[c]['msg'])
                   except:
-                     print 'thought it was a header, but failed'
+                     print >>sys.stderr, 'thought it was a header, but failed'
                      pass  # something dodgy, skip
                else:
                   # more of an in-fight message
@@ -438,7 +448,7 @@ def serverCode( serverName, port ):
                         # check the hash
                         hashb = md5.new(o[c]['msg']).hexdigest()
                         if hashb != o[c]['hash']:
-                           print 'message corrupted. hash does not match. resetting'
+                           print >>sys.stderr, 'message corrupted. hash does not match. resetting'
                            zeroOss(o[c])
                            continue
                         # data is not corrupted. unpack
@@ -459,12 +469,12 @@ def serverCode( serverName, port ):
                         #      print 'data not in oss keys of', i, 'keys', o[i].keys()
                         #print 'oss keys', len(o.keys()), 'ost keys', j
                      except:
-                        print 'corrupted data from', c
+                        print >>sys.stderr, 'corrupted data from', c
                      # put the message back into recv mode
                      # note that 'data' has not yet been processed so must be left alone
                      zeroOss(o[c])
                   elif o[c]['cnt'] > o[c]['size']:
-                     print 'too much data. resetting'
+                     print >>sys.stderr, 'too much data. resetting'
                      zeroOss(o[c])
 
             else:
@@ -503,7 +513,7 @@ def clientCode( serverName, port, fsList ):
       try:
          c.connect((serverName, port))
       except:
-         print 'could not connect to', (serverName, port)
+         print >>sys.stderr, 'could not connect to', (serverName, port)
          time.sleep(5)
          continue
 
@@ -538,22 +548,33 @@ def clientCode( serverName, port, fsList ):
             c.send(b)
             #print 'sent', len(b)
          except:
-            print 'send of', len(h), len(b), 'failed'
+            print >>sys.stderr, 'send of', len(h), len(b), 'failed'
             c.close()
             break
 
          iNew, now = syncToNextInterval()
          if iNew != (i+1)%clientSend or now - t0 > dt:
-            print 'collect took too long', now-t0, 'last interval', i, 'this interval', iNew
+            print >>sys.stderr, 'collect took too long', now-t0, 'last interval', i, 'this interval', iNew
          i = iNew
 
 def usage():
-   print sys.argv[0] + ' [server fsName1 [fsName2 ...]]'
+   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [server fsName1 [fsName2 ...]]'
    print '  server takes no args'
    print '  client needs a server name and one or more lustre filesystem names'
+   print '  --verbose - print summary of data sent to servers'
+   print '  --dryrun  - do not send results to ganglia'
    sys.exit(1)
 
 def parseArgs( host ):
+   global verbose, dryrun
+   for v in ('-v', '--verbose'):
+      if v in sys.argv:
+         verbose = 1
+         sys.argv.remove(v)
+   for v in ('-d', '--dryrun'):
+      if v in sys.argv:
+         dryrun = 1
+         sys.argv.remove(v)
    if len(sys.argv) == 1:
       return host, None # server takes no args
    if len(sys.argv) < 3:
