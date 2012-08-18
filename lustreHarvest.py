@@ -41,17 +41,15 @@ dt = 60.0/clientSend
 hostCache = {}
 secretText = None
 
-def getHost(i):
+def getHost(ip):
    try:
-      host = hostCache[i]
+      host = hostCache[ip]
    except:
-      # split up ip@lnet
-      ip = i.split('@')[0]
       try:
          host = socket.gethostbyaddr(ip)[0]
       except:
          host = None
-   hostCache[i] = host
+   hostCache[ip] = host
    return host
 
 def spoofIntoGanglia(g, o, name, unit):
@@ -59,8 +57,8 @@ def spoofIntoGanglia(g, o, name, unit):
       return
    for i, d in o.iteritems():
       # decode ip@lnet to a hostname
-      host = getHost(i)
       ip = i.split('@')[0]
+      host = getHost(ip)
       #print 'ip', ip, 'host', host
       if host == None:
          # if the host is unknown then it could be data for a different cluster. ignore it.
