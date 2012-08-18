@@ -41,26 +41,29 @@ dt = 60.0/clientSend
 hostCache = {}
 secretText = None
 
-def getHost(ip):
+def getHost(i):
    try:
-      host = hostCache[ip]
+      host = hostCache[i]
    except:
+      # split up ip@lnet
+      ip = i.split('@')[0]
       try:
          host = socket.gethostbyaddr(ip)[0]
-         hostCache[ip] = host
       except:
          host = None
+   hostCache[i] = host
    return host
 
 def spoofIntoGanglia(g, o, name, unit):
    if len(o) == 0 or dryrun:
       return
    for i, d in o.iteritems():
-      ip = i.split('@')[0]
-      host = getHost(ip)
+      # decode ip@lnet to a hostname
+      host = getHost(i)
       #print 'ip', ip, 'host', host
       if host == None:
-         print >>sys.stderr, 'unknown host', i, ip
+         # if the host is unknown then it could be data for a different cluster. ignore it.
+         #print >>sys.stderr, 'unknown host', i, ip
          continue
       spoofStr = ip + ':' + host
       g.send( name, '%.2f' % d, 'float', unit, 'both', 60, 0, "", spoofStr )
@@ -304,7 +307,7 @@ def removeProcessedData(o):
    for oss in o.keys():
       if 'data' in o[oss].keys():
          o[oss]['data'] = {}
-      
+
 def printRate(s,o):
    if len(o.keys()) == 0:
       return
