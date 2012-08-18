@@ -32,11 +32,14 @@ nameMap = { 'data':'vu_short',
           'system':'vu_system' }
 
 statsDir = { 'oss':'/proc/fs/lustre/obdfilter', 'mds':'/proc/fs/lustre/mds' }
-dt = 60.0/clientSend
 verbose = 0
 dryrun = 0
+# shared secret between client and servers. only readable by root
+secretFile = '/root/.lustreHarvest.secret'
 
+dt = 60.0/clientSend
 hostCache = {}
+secretText = None
 
 def getHost(ip):
    try:
@@ -61,6 +64,25 @@ def spoofIntoGanglia(g, o, name, unit):
          continue
       spoofStr = ip + ':' + host
       g.send( name, '%.2f' % d, 'float', unit, 'both', 60, 0, "", spoofStr )
+
+def readSecret():
+   global secretText
+   try:
+      l = open( secretFile, 'r' ).readlines()
+   except:
+      print >> sys.stderr, 'problem reading secret file:', secretFile
+      sys.exit(1)
+   # check for and complain about an empty secret file
+   ok = 0
+   for i in l:
+      i = i.strip()
+      if i != '':
+         ok = 1
+         break
+   if not ok:
+      print >> sys.stderr, 'nothing in the shared secret file:', secretFile
+      sys.exit(1)
+   secretText = str(l)
 
 def computeRates( sOld, s, tOld, t ):
    if len(s) == 0:  # no data for this fs
@@ -420,10 +442,9 @@ def serverCode( serverName, port ):
                      print >>sys.stderr, 'short header. skipping', c, 'len', len(data)
                      continue
                   try:
-                     #     'header ', message length, padding, hash of message body, hash of prev 96 bytes of this header
-                     #  len    7         N ~= 6        64-N-7           32                        32
+                     # see client section for the fields in the data header
                      hashh = data[96:128]
-                     if hashh != md5.new(data[:96]).hexdigest():
+                     if hashh != md5.new(data[:96] + secretText).hexdigest():
                         print >>sys.stderr, 'corrupted header. skipping. hashes do not match'
                         continue
                      hashb = data[64:96]
@@ -532,13 +553,20 @@ def clientCode( serverName, port, fsList ):
 
          # 128 byte header
          # this needs to be a fixed size as messages get aggregated
-         # format is
-         #     'header ', message length, padding, hash of message body, hash of prev 96 bytes of this header
-         #  len    7         N ~= 6        64-N-7           32                        32
+         #
+         #   length
+         #  in bytes    field
+         #  --------   -------
+         #     7       plain text 'header '
+         #     N       message length in bytes ~= 6
+         #  64-N-7     padding  (room left in here)
+         #    32       hash of message body
+         #    32       hash of all prev bytes of this header + contents of the shared secret file
+
          h = 'header %d' % len(b)
          h += ' '*(64-len(h))   # room in here for more fields if we need it
          h += hashb
-         hashh = md5.new(h).hexdigest()
+         hashh = md5.new(h + secretText).hexdigest()
          h += hashh
          #print 'header len', len(h)
 
@@ -554,19 +582,22 @@ def clientCode( serverName, port, fsList ):
 
          iNew, now = syncToNextInterval()
          if iNew != (i+1)%clientSend or now - t0 > dt:
-            print >>sys.stderr, 'collect took too long', now-t0, 'last interval', i, 'this interval', iNew
+            psrint >>sys.stderr, 'collect took too long', now-t0, 'last interval', i, 'this interval', iNew
          i = iNew
 
 def usage():
-   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [server fsName1 [fsName2 ...]]'
+   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [--secretfile file] [server fsName1 [fsName2 ...]]'
    print '  server takes no args'
    print '  client needs a server name and one or more lustre filesystem names'
-   print '  --verbose - print summary of data sent to servers'
-   print '  --dryrun  - do not send results to ganglia'
+   print '  --verbose         - print summary of data sent to servers'
+   print '  --dryrun          - do not send results to ganglia'
+   print '  --secretfile file - specify an alternate shared secret file. default', secretFile
    sys.exit(1)
 
 def parseArgs( host ):
-   global verbose, dryrun
+   global verbose, dryrun, secretFile
+
+   # parse optional args
    for v in ('-v', '--verbose'):
       if v in sys.argv:
          verbose = 1
@@ -575,6 +606,12 @@ def parseArgs( host ):
       if v in sys.argv:
          dryrun = 1
          sys.argv.remove(v)
+   if '--secretfile' in sys.argv:
+      v = sys.argv.index( '--secretfile' )
+      assert( len(sys.argv) > v+1 )
+      secretFile = sys.argv.pop(v+1)
+      sys.argv.pop(v)
+
    if len(sys.argv) == 1:
       return host, None # server takes no args
    if len(sys.argv) < 3:
@@ -584,6 +621,7 @@ def parseArgs( host ):
 if __name__ == '__main__':
    host = socket.gethostname()
    serverName, fsList = parseArgs( host )
+   readSecret()
    if host == serverName:
       serverCode( serverName, port ) # server recv code
    else:
