@@ -25,6 +25,6 @@ the master aggregator process runs on ''host'' which is typically a management s
 
 this turns the data it recieves into rates for each client and spoofs these into [ganglia](https://github.com/ganglia/) using the [gmetric.py](https://github.com/ganglia/ganglia_contrib/tree/master/gmetric-python) module.
 
-data is tranferred by sending serialised python objects transported over simple TCP connections. client sends are closely synchronised so that the server can tell when a data gathering sweep is finished, sum and generate statistics for each client, and spoof close to coherent data into ganglia. data integrity (but not authenticity) is verified by md5 sums of the objects.
+data is tranferred by sending serialised python objects transported over simple TCP connections. client sends are closely synchronised so that the server can tell when a data gathering sweep is finished, sum and generate statistics for each client, and spoof close to coherent data into ganglia. data integrity is verified by md5 sums of the objects. authenticity is ensured by using a shared secret.
 
-lustreHarvest transparently handles client and server process disconnections and restarts.
+lustreHarvest transparently handles client and server process disconnections and restarts (eg. OSS reboots).
