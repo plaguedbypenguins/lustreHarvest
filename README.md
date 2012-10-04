@@ -7,8 +7,8 @@ the goal is to have i/o rates to Lustre filesystems show up in the ganglia of ea
 
 lustreHarvest is a simple python script that acts as both data gatherer on the Lustre servers and as aggregator on the machine that spoofs the processed data into ganglia.
 
-![alt text](docs/cluster_ops.png "whole cluster iops")
-![alt text](docs/node_io.png "i/o from a node")
+![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/cluster_ops.png "whole cluster iops")
+![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/node_io.png "i/o from a node")
 
 How it Works
 ------------
