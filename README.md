@@ -3,7 +3,7 @@ lustreHarvest
 
 harvest Lustre filesystem OST/MDT read, write, iops stats and spoof them into the ganglia of client nodes.
 
-the goal is to have i/o rates to [Lustre](http://en.wikipedia.org/wiki/Lustre_(file_system)) filesystems show up in the [ganglia](https://github.com/ganglia/) of each cluster node so that we can easily see how much i/o each client is doing. lustreHarvest gathers read, write and iops rates from OSS machines and iops from MDS machines. Multiple filesystems on each OSS or MDS are supported.
+the goal is to have i/o rates to [Lustre](http://en.wikipedia.org/wiki/Lustre_(file_system&#41;) filesystems show up in the [ganglia](https://github.com/ganglia/) of each cluster node so that we can easily see how much i/o each client is doing. lustreHarvest gathers read, write and iops rates from OSS machines and iops from MDS machines. Multiple filesystems on each OSS or MDS are supported.
 
 lustreHarvest is a simple python script that acts as both data gatherer on the Lustre servers and as aggregator on the machine that spoofs the processed data into ganglia.
 
