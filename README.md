@@ -8,7 +8,7 @@ the goal is to have i/o rates to [Lustre](http://en.wikipedia.org/wiki/Lustre_%2
 lustreHarvest is a simple python script that acts as both data gatherer on the Lustre servers and as aggregator on the machine that spoofs the processed data into ganglia.
 
 ![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/cluster_ops.png "whole cluster iops")
-![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/node_io.png "i/o from a node")
+![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/node_io.png "read and write i/o from one node")
 
 How it Works
 ------------
