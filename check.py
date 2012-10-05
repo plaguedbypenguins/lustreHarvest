@@ -4,6 +4,8 @@
 #  (c) rjh - Fri Oct  5 18:16:27 EST 2012
 # licensed under the GPL v3 or later
 
+import sys
+
 def read(gmondHost):
    import socket
    sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
@@ -96,11 +98,26 @@ def printTop(d, b):
       if r > thresh:
          print n + ' '*(l - len(n)), printBytes(r, 0, b)
 
+def parseArgs():
+   hn = 'localhost'
+   if len(sys.argv) > 1:
+      if sys.argv[1][0] == '-': # -anything is help
+         usage()
+      hn = sys.argv[1]
+   print 'using gmond data from', hn
+   return hn
+
+def usage():
+   print sys.argv[0], '[--help] [host]'
+   sys.exit(1)
+
 if __name__ == '__main__':
    from lustreHarvest import nameMap
 
+   hn = parseArgs()
+
    # read from gmond on the local node
-   x = read('localhost')
+   x = read(hn)
 
    # see what we have in ganglia...
    m = []
