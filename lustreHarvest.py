@@ -145,7 +145,7 @@ def gatherStats(fs):
    s = {}
    osts = []
    # handle both mds and oss
-   for type, ld in statsDir.iteritems():
+   for machType, ld in statsDir.iteritems():
       try:
          dirs = os.listdir(ld)
       except:
@@ -156,7 +156,7 @@ def gatherStats(fs):
             osts.append(d)
       for o in osts:
          s[o] = {}
-         s[o]['type'] = type   # oss or mds data
+         s[o]['type'] = machType   # oss or mds data
          ostDir = ld + '/' + o + '/exports'
          # loop over all clients
          for c in os.listdir(ostDir):
@@ -257,9 +257,9 @@ def sumDataToClients(o, t):
       s = o[oss]['data'] # shorten for easier use
       for f in s.keys(): # filesystems
          for ost in s[f].keys():
-            type = s[f][ost]['type']  # oss or mds
+            machType = s[f][ost]['type']  # oss or mds
             del s[f][ost]['type']
-            if type == 'oss':
+            if machType == 'oss':
                ostCnt[f] += 1
                for i in s[f][ost].keys():  # loop over clients
                   rc, wc, opsc = s[f][ost][i]
@@ -300,7 +300,7 @@ def sumDataToClients(o, t):
 
 def zeroOss(o):
    o['size'] = -1
-   # leave o['data'] there
+   # leave o['data'] intact
 
 def removeProcessedData(o):
    for oss in o.keys():
