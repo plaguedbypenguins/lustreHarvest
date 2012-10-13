@@ -529,20 +529,53 @@ def syncToNextInterval( offset = 0 ):
    time.sleep(sl)
    return i, t
 
+def connectSocket(sp):
+   c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   try:
+      c.connect(sp)
+   except:
+      print >>sys.stderr, 'could not connect to', sp
+      c = None
+   return c
+
+def constructMessage(s):
+   """construct header and body of message"""
+   b = cPickle.dumps(s)
+   hashb = md5.new(b).hexdigest()
+
+   # 128 byte header
+   # this needs to be a fixed size as messages get aggregated
+   #
+   #   length
+   #  in bytes    field
+   #  --------   -------
+   #     7       plain text 'header '
+   #     N       message length in bytes ~= 6
+   #  64-N-7     padding  (room left in here)
+   #    32       hash of message body
+   #    32       hash of all prev bytes of this header + contents of the shared secret file
+
+   h = 'header %d' % len(b)
+   h += ' '*(64-len(h))   # room in here for more fields if we need it
+   h += hashb
+   hashh = md5.new(h + secretText).hexdigest()
+   h += hashh
+   #print 'header len', len(h)
+
+   return h, b
+
 def clientCode( serverName, port, fsList ):
    while 1:
       i, now = syncToNextInterval()
-      c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      try:
-         c.connect((serverName, port))
-      except:
-         print >>sys.stderr, 'could not connect to', (serverName, port)
+      c = connectSocket( (serverName, port) )
+      if c == None:
          time.sleep(5)
          continue
 
       while 1:
          t0 = time.time()
          s = {}
+         s['dataType'] = 'direct'
          for f in fsList:
             s[f] = gatherStats(f)
          ## debug:
@@ -550,30 +583,8 @@ def clientCode( serverName, port, fsList ):
          #for o in s.keys():
          #   print o, len(s[o])
 
-         b = cPickle.dumps(s)
-         hashb = md5.new(b).hexdigest()
-
-         # 128 byte header
-         # this needs to be a fixed size as messages get aggregated
-         #
-         #   length
-         #  in bytes    field
-         #  --------   -------
-         #     7       plain text 'header '
-         #     N       message length in bytes ~= 6
-         #  64-N-7     padding  (room left in here)
-         #    32       hash of message body
-         #    32       hash of all prev bytes of this header + contents of the shared secret file
-
-         h = 'header %d' % len(b)
-         h += ' '*(64-len(h))   # room in here for more fields if we need it
-         h += hashb
-         hashh = md5.new(h + secretText).hexdigest()
-         h += hashh
-         #print 'header len', len(h)
-
+         h, b = contructMessage(s)
          try:
-            pass
             c.send(h)
             c.send(b)
             #print 'sent', len(b)
