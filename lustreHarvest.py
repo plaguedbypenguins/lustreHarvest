@@ -31,12 +31,15 @@ nameMap = { 'data':'vu_short',
           'images':'vu_images',
           'system':'vu_system' }
 
-# lnets local to each cluster 
-localLnets = { 'vu-pbs':'o2ib', 'xepbs':'o2ib2', 'dccpbs':'tcp102' }
+# names of cluster head nodes where server instances of this script run
+head = { 'vu':'vu-pbs', 'xe':'xepbs', 'dcc':'dccpbs' }
+
+# lnets local to each cluster
+localLnets = { 'vu':'o2ib', 'xe':'o2ib2', 'dc':'tcp102' }
 
 # relaying servers send summed data to various other server instances.
-# specify which servers do relaying, and which lnet's get send to which servers
-relay = { 'alkindi': [ 'vu-pbs', 'xepbs', 'dccpbs' ] }
+# specify which clusters to relay to
+relay = { 'alkindi': [ 'vu', 'xe', 'dcc' ] }
 
 statsDir = { 'oss':'/proc/fs/lustre/obdfilter', 'mds':'/proc/fs/lustre/mds' }
 verbose = 0
@@ -329,7 +332,8 @@ def doRelay(rs, host, port, data):
       return
 
    # setup connections to the hosts we are relaying to
-   for hnin relay[host]:
+   for cluster in relay[host]:
+      hn = head[cluster]
       if hn not in rs.keys() or rs[hn] == None:
          rs[hn] = connectSocket((hn, port))
          print >>sys.stderr, 'setting up new relay connection to', (hn,port)
@@ -340,7 +344,8 @@ def doRelay(rs, host, port, data):
    s['dataType'] = 'relay'
    s['data'] = data
 
-   for hn in relay[host]:
+   for cluster in relay[host]:
+      hn = head[cluster]
       h, b = contructMessage(s)
       c = rs[hn]
       if c == None:
