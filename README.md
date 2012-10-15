@@ -3,9 +3,12 @@ lustreHarvest
 
 harvest Lustre filesystem OST/MDT read, write, iops stats and spoof them into the ganglia of client nodes.
 
-the goal is to have i/o rates to Lustre filesystems show up in the ganglia of each cluster node so that we can easily see how much i/o each client is doing. lustreHarvest gathers read, write and iops rates from OSS machines and iops from MDS machines. Multiple filesystems on each OSS or MDS are supported.
+the goal is to have i/o rates to [Lustre](http://en.wikipedia.org/wiki/Lustre_%28file_system%29 "Lustre at Wikipedia") filesystems show up in the [ganglia](https://github.com/ganglia/) of each cluster node so that we can easily see how much i/o each client is doing. lustreHarvest gathers read, write and iops rates from OSS machines and iops from MDS machines. Multiple filesystems on each OSS or MDS are supported.
 
 lustreHarvest is a simple python script that acts as both data gatherer on the Lustre servers and as aggregator on the machine that spoofs the processed data into ganglia.
+
+![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/cluster_ops.png "whole cluster iops")
+![alt text](http://sf.anu.edu.au/~rjh900/git/lustreHarvest/node_io.png "read and write i/o from one node")
 
 How it Works
 ------------
@@ -20,8 +23,8 @@ the master aggregator process runs on ''host'' which is typically a management s
 
    ./lustreHarvest.py
 
-this turns the data it recieves into rates for each client and spoofs these into ganglia using the gmetric.py module.
+this turns the data it recieves into rates for each client and spoofs these into [ganglia](https://github.com/ganglia/) using the [gmetric.py](https://github.com/ganglia/ganglia_contrib/tree/master/gmetric-python) module.
 
-data is tranferred by sending serialised python objects transported over simple TCP connections. client sends are closely synchronised so that the server can tell when a data gathering sweep is finished, sum and generate statistics for each client, and spoof close to coherent data into ganglia. data integrity (but not authenticity) is verified by md5 sums of the objects.
+data is tranferred by sending serialised python objects transported over simple TCP connections. client sends are closely synchronised so that the server can tell when a data gathering sweep is finished, sum and generate statistics for each client, and spoof close to coherent data into ganglia. data integrity is verified by md5 sums of the objects. authenticity is ensured by using a shared secret.
 
-lustreHarvest transparently handles client and server process disconnections and restarts.
+lustreHarvest transparently handles client and server process disconnections and restarts (eg. OSS reboots).
