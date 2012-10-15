@@ -31,6 +31,13 @@ nameMap = { 'data':'vu_short',
           'images':'vu_images',
           'system':'vu_system' }
 
+# lnets local to each cluster 
+localLnets = { 'vu-pbs':'o2ib', 'xepbs':'o2ib2', 'dccpbs':'tcp102' }
+
+# relaying servers send summed data to various other server instances.
+# specify which servers do relaying, and which lnet's get send to which servers
+relay = { 'alkindi': [ 'vu-pbs', 'xepbs', 'dccpbs' ] }
+
 statsDir = { 'oss':'/proc/fs/lustre/obdfilter', 'mds':'/proc/fs/lustre/mds' }
 verbose = 0
 dryrun = 0
@@ -315,6 +322,57 @@ def printRate(s,o):
       j += o[i]
    print s, j
 
+
+def doRelay(rs, host, port, data):
+   # bundle all data up into a message of a new type to send to other clusters
+   if host not in relay.keys():
+      return
+
+   # setup connections to the hosts we are relaying to
+   for hnin relay[host]:
+      if hn not in rs.keys() or rs[hn] == None:
+         rs[hn] = connectSocket((hn, port))
+         print >>sys.stderr, 'setting up new relay connection to', (hn,port)
+
+   # construct message
+   #   ... for now, send all data, regardless of lnet
+   s = {}
+   s['dataType'] = 'relay'
+   s['data'] = data
+
+   for hn in relay[host]:
+      h, b = contructMessage(s)
+      c = rs[hn]
+      if c == None:
+         continue
+      try:
+         c.send(h)
+         c.send(b)
+         #print 'sent', len(b)
+      except:
+         print >>sys.stderr, 'relay send of', len(h), len(b), 'failed'
+         c.close()
+         rs[hn] = None
+
+   return rs
+
+
+# server relay code:
+#  - as recv message, tag data as being of different type
+#    but leave it in o[c] anyway for convenience of message handling
+#  - skip processing of this data in sumDataToClients()
+#  - call mergeWithPreSummedData() to merge data from remote
+#    clients with regular clients
+#  - can sum per oss data and send to /g/data ganglia as well ??
+
+# notes:
+#  - time skew and delay in data is necessary as need to recv, delay, sum and then send summed data
+#    ie. relaying cluster needs to run with an offset of ~5s before the others
+#  - simple way to write it is to relay all summed data to all clusters ie. unecessarily large transmits,
+#    but this is necessary in the 'zero knowledge of endpoints' relayer model
+
+
+
 def serverCode( serverName, port ):
    import gmetric
 
@@ -356,6 +414,7 @@ def serverCode( serverName, port ):
    tLast = time.time()  # the time we last got a block from clients
    processed = 1
    first = 1
+   rs = {}  # relay sockets used to send to other clusters
 
    while inputs:
       # Wait for at least one of the sockets to be ready for processing
@@ -377,6 +436,8 @@ def serverCode( serverName, port ):
              fssOld = fss
              # sum all data from all servers to the clients
              r, w, ossOps, mdsOps, fss = sumDataToClients(o, t)
+             # relay some of the summed data to other server instances
+             rs = doRelay(rs, serverName, port, (r, w, ossOps, mdsOps, fss))
              # remove data fields to avoid re-processing data from stopped oss's. not necessary??
              removeProcessedData(o)
              if fss != fssOld:
@@ -521,7 +582,7 @@ def serverCode( serverName, port ):
 def syncToNextInterval( offset = 0 ):
    # sleep until the next interval
    t = time.time() % 60
-   t += offset      # optional time skew
+   t += (60 + offset)   # optional time skew
    t %= 60
    i = int(t/dt)    # interval number
    sl = (i+1)*dt - t
