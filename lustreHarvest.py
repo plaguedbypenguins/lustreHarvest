@@ -386,7 +386,7 @@ def doRelaySend(rs, host, port, data):
 
    for cluster in relay[host]:
       hn = head[cluster]
-      h, b = contructMessage(s)
+      h, b = constructMessage(s)
       c = rs[hn]
       if c == None:
          continue
@@ -689,7 +689,7 @@ def clientCode( serverName, port, fsList ):
          #for o in s.keys():
          #   print o, len(s[o])
 
-         h, b = contructMessage(s)
+         h, b = constructMessage(s)
          try:
             c.send(h)
             c.send(b)
