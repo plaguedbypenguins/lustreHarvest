@@ -207,6 +207,8 @@ def sumDataToClients(o, t):
    Nost = 0
    fss = []
    for oss in o.keys():
+      if o[oss]['dataType'] == 'relay':  # skip relay data
+         continue
       if 'data' in o[oss].keys():
          if len(o[oss]['data'].keys()):
             fss.extend(o[oss]['data'].keys())
@@ -223,6 +225,8 @@ def sumDataToClients(o, t):
    # build list of all clients
    c = []
    for oss in o.keys():
+      if o[oss]['dataType'] == 'relay':  # skip relay data
+         continue
       for f in o[oss]['data'].keys():  # filesystems
          for ost in o[oss]['data'][f].keys():
             c.extend(o[oss]['data'][f][ost].keys())
@@ -264,6 +268,8 @@ def sumDataToClients(o, t):
 
    # sum across clients
    for oss in o.keys():
+      if o[oss]['dataType'] == 'relay':  # skip relay data
+         continue
       s = o[oss]['data'] # shorten for easier use
       for f in s.keys(): # filesystems
          for ost in s[f].keys():
@@ -308,6 +314,36 @@ def sumDataToClients(o, t):
 
    return r, w, ossOps, mdsOps, fss
 
+def mergeRemotePreSummed(o, d):
+   # optimise away the case where there is no remotely summed data
+   rem = 0
+   for oss in o.keys():
+      if o[oss]['dataType'] == 'relay':  # found remote data
+         rem = 1
+   if not rem:
+      return d
+
+   # local data
+   r, w, ossOps, mdsOps, fss = d
+
+   for oss in o.keys():
+      if o[oss]['dataType'] != 'relay':  # skip local data
+         continue
+      rRem, wRem, ossOpsRem, mdsOpsRem, fssRem = o[oss]['data']
+
+      for f in fssRem:
+         if f in fss:
+            # not sure how this can happen...
+            print >>sys.stderr, 'error. remote summed data from', oss, 'is for a local fs', f
+            continue
+         fss.append(f)
+         r[f] = rRem[f]
+         w[f] = wRem[f]
+         ossOps[f] = ossOpsRem[f]
+         mdsOps[f] = mdsOpsRem[f]
+
+   return r, w, ossOps, mdsOps, fss
+
 def zeroOss(o):
    o['size'] = -1
    # leave o['data'] intact
@@ -326,8 +362,12 @@ def printRate(s,o):
    print s, j
 
 
-def doRelay(rs, host, port, data):
-   # bundle all data up into a message of a new type to send to other clusters
+def doRelaySend(rs, host, port, data):
+   # bundle all data up into a message of dataType 'relay' and
+   # send to other clusters. return connections also so we
+   # can re-use them next time
+
+   # check to see if we should be relaying anything to anywhere
    if host not in relay.keys():
       return
 
@@ -353,7 +393,7 @@ def doRelay(rs, host, port, data):
       try:
          c.send(h)
          c.send(b)
-         #print 'sent', len(b)
+         #print 'relay sent', len(b)
       except:
          print >>sys.stderr, 'relay send of', len(h), len(b), 'failed'
          c.close()
@@ -362,20 +402,13 @@ def doRelay(rs, host, port, data):
    return rs
 
 
-# server relay code:
-#  - as recv message, tag data as being of different type
-#    but leave it in o[c] anyway for convenience of message handling
-#  - skip processing of this data in sumDataToClients()
-#  - call mergeWithPreSummedData() to merge data from remote
-#    clients with regular clients
-#  - can sum per oss data and send to /g/data ganglia as well ??
-
 # notes:
 #  - time skew and delay in data is necessary as need to recv, delay, sum and then send summed data
-#    ie. relaying cluster needs to run with an offset of ~5s before the others
+#    ie. relaying cluster needs to run with an offset of ~5s(?) before the others
 #  - simple way to write it is to relay all summed data to all clusters ie. unecessarily large transmits,
 #    but this is necessary in the 'zero knowledge of endpoints' relayer model
-
+#  - central fs has only remote clients so most info it gathers is useful only for remote clusters.
+#    however one meaningful number is the per oss data that could be dropped into central fs's ganglia
 
 
 def serverCode( serverName, port ):
@@ -440,9 +473,16 @@ def serverCode( serverName, port ):
              mdsOpsOld = mdsOps
              fssOld = fss
              # sum all data from all servers to the clients
-             r, w, ossOps, mdsOps, fss = sumDataToClients(o, t)
-             # relay some of the summed data to other server instances
-             rs = doRelay(rs, serverName, port, (r, w, ossOps, mdsOps, fss))
+             d = sumDataToClients(o, t)
+
+             # maybe relay some of the summed data to other server instances
+             rs = doRelaySend(rs, serverName, port, d)
+
+             # maybe merge remote pre-summed data into our local data
+             d = mergeRemotePreSummed(o, d)
+
+             r, w, ossOps, mdsOps, fss = d
+
              # remove data fields to avoid re-processing data from stopped oss's. not necessary??
              removeProcessedData(o)
              if fss != fssOld:
