@@ -723,16 +723,17 @@ def clientCode( serverName, port, fsList ):
          i = iNew
 
 def usage():
-   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [--secretfile file] [server fsName1 [fsName2 ...]]'
+   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [--secretfile file] [--port portnum] [server fsName1 [fsName2 ...]]'
    print '  server takes no args'
    print '  client needs a server name and one or more lustre filesystem names'
    print '  --verbose         - print summary of data sent to servers'
    print '  --dryrun          - do not send results to ganglia'
    print '  --secretfile file - specify an alternate shared secret file. default', secretFile
+   print '  --port portnum    - tcp port num to send/recv on. default', port
    sys.exit(1)
 
 def parseArgs( host ):
-   global verbose, dryrun, secretFile
+   global verbose, dryrun, secretFile, port
 
    # parse optional args
    for v in ('-v', '--verbose'):
@@ -747,6 +748,11 @@ def parseArgs( host ):
       v = sys.argv.index( '--secretfile' )
       assert( len(sys.argv) > v+1 )
       secretFile = sys.argv.pop(v+1)
+      sys.argv.pop(v)
+   if '--port' in sys.argv:
+      v = sys.argv.index( '--port' )
+      assert( len(sys.argv) > v+1 )
+      port = int(sys.argv.pop(v+1))
       sys.argv.pop(v)
 
    if len(sys.argv) == 1:
