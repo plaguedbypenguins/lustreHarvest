@@ -283,10 +283,10 @@ def sumDataToClients(o, t):
                   r[f][i] += rc
                   w[f][i] += wc
                   ossOps[f][i] += opsc
-                  # debug
-                  rTot[f] += rc
-                  wTot[f] += wc
-                  ossOpsTot[f] += opsc
+                  if verbose:  # info/debug
+                     rTot[f] += rc
+                     wTot[f] += wc
+                     ossOpsTot[f] += opsc
             else:
                mdtCnt[f] += 1
                for i in s[f][ost].keys():  # loop over clients
@@ -294,10 +294,10 @@ def sumDataToClients(o, t):
                   r[f][i] += rc
                   w[f][i] += wc
                   mdsOps[f][i] += opsc
-                  # debug
-                  rTot[f] += rc
-                  wTot[f] += wc
-                  mdsOpsTot[f] += opsc
+                  if verbose:  # info/debug
+                     rTot[f] += rc
+                     wTot[f] += wc
+                     mdsOpsTot[f] += opsc
    if verbose:
       #print 'c', c
       for f in fss:
@@ -316,6 +316,8 @@ def sumDataToClients(o, t):
    return r, w, ossOps, mdsOps, fss
 
 def mergeRemotePreSummed(o, d):
+   t = time.time()
+
    # optimise away the case where there is no remotely summed data
    rem = 0
    for oss in o.keys():
@@ -332,6 +334,11 @@ def mergeRemotePreSummed(o, d):
          continue
       rRem, wRem, ossOpsRem, mdsOpsRem, fssRem = o[oss]['data']
 
+      rTot = 0
+      wTot = 0
+      ossOpsTot = 0
+      mdsOpsTot = 0
+
       for f in fssRem:
          if f in fss:
             # not sure how this can happen...
@@ -342,6 +349,16 @@ def mergeRemotePreSummed(o, d):
          w[f] = wRem[f]
          ossOps[f] = ossOpsRem[f]
          mdsOps[f] = mdsOpsRem[f]
+
+         if verbose:
+            for c in r[f].keys():
+               rTot += r[f][c]
+               wTot += w[f[]c]
+               ossOpsTot += ossOps[f][c]
+               mdsOpsTot += mdsOpsTot[f][c]
+            print f, 'remote tot GB r,w, M ops mds,oss', rTot/(1024*1024*1024), wTot/(1024*1024*1024), mdsOpsTot/(1024*1024), ossOpsTot/(1024*1024)
+   if verbose:
+      print 'remote merge process time', time.time() - t
 
    return r, w, ossOps, mdsOps, fss
 
