@@ -29,7 +29,8 @@ nameMap = { 'data':'vu_short',
             'apps':'vu_apps',
             'home':'vu_home',
           'images':'vu_images',
-          'system':'vu_system' }
+          'system':'vu_system',
+           'gdata':'g_data' }
 
 # names of cluster head nodes where server instances of this script run
 head = { 'vu':'vu-pbs', 'xe':'xepbs', 'dcc':'dccpbs' }
