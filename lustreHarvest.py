@@ -352,7 +352,7 @@ def mergeRemotePreSummed(o, d):
          if verbose:
             for c in r[f].keys():
                rTot += r[f][c]
-               wTot += w[f[]c]
+               wTot += w[f][c]
                ossOpsTot += ossOps[f][c]
                mdsOpsTot += mdsOpsTot[f][c]
             print f, 'remote tot GB r,w, M ops mds,oss', rTot/(1024*1024*1024), wTot/(1024*1024*1024), mdsOpsTot/(1024*1024), ossOpsTot/(1024*1024)
