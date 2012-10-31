@@ -20,11 +20,10 @@
 
 import os, socket, select, sys, cPickle, time, subprocess, md5
 
-# these should be command line or config file args:
 port = 8022
 clientSend = 3  # number of gathers per minute on clients
 
-# could generalise this to multiple clusters?
+# map between fs name in lustre and the name we want to see in ganglia
 nameMap = { 'data':'vu_short',
             'apps':'vu_apps',
             'home':'vu_home',
