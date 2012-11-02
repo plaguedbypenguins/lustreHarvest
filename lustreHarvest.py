@@ -20,8 +20,9 @@
 
 import os, socket, select, sys, cPickle, time, subprocess, md5
 
-port = 8022
+port = 8022  # default port
 clientSend = 3  # number of gathers per minute on clients
+serverInterfaceName = None
 
 # map between fs name in lustre and the name we want to see in ganglia
 nameMap = { 'data':'vu_short',
@@ -32,10 +33,10 @@ nameMap = { 'data':'vu_short',
            'gdata':'g_data' }
 
 # names of cluster head nodes where server instances of this script run
-head = { 'vu':'vu-pbs', 'xe':'xepbs', 'dcc':'dccpbs' }
+head = { 'vu':'vu-man4', 'xe':'xepbs', 'dcc':'dccpbs' }
 
-# lnets local to each cluster
-localLnets = { 'vu':'o2ib', 'xe':'o2ib2', 'dc':'tcp102' }
+# lnets of each cluster
+localLnets = { 'vu':'o2ib', 'xe':'o2ib2', 'dcc':'tcp102' }
 
 # relaying servers send summed data to various other server instances.
 # specify which clusters to relay to
@@ -189,8 +190,6 @@ def uniq( list ):
    return l
 
 def sumDataToClients(o, t):
-   t = time.time()
-
    # check times across stats are recent
    tData = t
    for oss in o.keys():
@@ -232,7 +231,8 @@ def sumDataToClients(o, t):
             c.extend(o[oss]['data'][f][ost].keys())
    c.sort()
    c = uniq(c)
-   c.remove('type')
+   if 'type' in c:
+      c.remove('type')
    if verbose:
       #print 'clients', len(c)
       print 'oss', len(o.keys()), 'ost', Nost, 'clients', len(c), 'filesystems', fss
@@ -331,7 +331,7 @@ def mergeRemotePreSummed(o, d):
    for oss in o.keys():
       if o[oss]['dataType'] != 'relay':  # skip local data
          continue
-      rRem, wRem, ossOpsRem, mdsOpsRem, fssRem = o[oss]['data']
+      rRem, wRem, ossOpsRem, mdsOpsRem, fssRem = o[oss]['data']['d']
 
       rTot = 0
       wTot = 0
@@ -352,9 +352,12 @@ def mergeRemotePreSummed(o, d):
          if verbose:
             for c in r[f].keys():
                rTot += r[f][c]
+            for c in w[f].keys():
                wTot += w[f][c]
+            for c in ossOps[f].keys():
                ossOpsTot += ossOps[f][c]
-               mdsOpsTot += mdsOpsTot[f][c]
+            for c in mdsOps[f].keys():
+               mdsOpsTot += mdsOps[f][c]
             print f, 'remote tot GB r,w, M ops mds,oss', rTot/(1024*1024*1024), wTot/(1024*1024*1024), mdsOpsTot/(1024*1024), ossOpsTot/(1024*1024)
    if verbose:
       print 'remote merge process time', time.time() - t
@@ -379,7 +382,7 @@ def printRate(s,o):
    print s, j
 
 
-def doRelaySend(rs, host, port, data):
+def doRelaySend(rs, host, port, d):
    # bundle all data up into a message of dataType 'relay' and
    # send to other clusters. return connections also so we
    # can re-use them next time
@@ -399,11 +402,11 @@ def doRelaySend(rs, host, port, data):
    #   ... for now, send all data, regardless of lnet
    s = {}
    s['dataType'] = 'relay'
-   s['data'] = data
+   s['d'] = d
+   h, b = constructMessage(s)
 
    for cluster in relay[host]:
       hn = head[cluster]
-      h, b = constructMessage(s)
       c = rs[hn]
       if c == None:
          continue
@@ -599,6 +602,12 @@ def serverCode( serverName, port ):
                            continue
                         # data is not corrupted. unpack
                         o[c]['data'] = cPickle.loads(o[c]['msg'])
+
+                        # shimmy the datatype up from data dict to the oss level
+                        # leaving just fs data in the (non-relay) data
+                        o[c]['dataType'] = o[c]['data']['dataType']
+                        del o[c]['data']['dataType']
+
                         t = time.time()
                         o[c]['time'] = t
                         tLast = t
@@ -722,17 +731,19 @@ def clientCode( serverName, port, fsList ):
          i = iNew
 
 def usage():
-   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [--secretfile file] [--port portnum] [server fsName1 [fsName2 ...]]'
+   print sys.argv[0] + '[-v|--verbose] [-d|--dryrun] [--secretfile file] [--port portnum] [--interface name] [server fsName1 [fsName2 ...]]'
    print '  server takes no args'
    print '  client needs a server name and one or more lustre filesystem names'
    print '  --verbose         - print summary of data sent to servers'
    print '  --dryrun          - do not send results to ganglia'
    print '  --secretfile file - specify an alternate shared secret file. default', secretFile
    print '  --port portnum    - tcp port num to send/recv on. default', port
+   print '  --interface name  - make server listen on the interface that matches a hostname of "name".'
+   print '                      default is to bind to the interface that matches gethostbyname'
    sys.exit(1)
 
 def parseArgs( host ):
-   global verbose, dryrun, secretFile, port
+   global verbose, dryrun, secretFile, port, serverInterfaceName
 
    # parse optional args
    for v in ('-v', '--verbose'):
@@ -753,6 +764,11 @@ def parseArgs( host ):
       assert( len(sys.argv) > v+1 )
       port = int(sys.argv.pop(v+1))
       sys.argv.pop(v)
+   if '--interface' in sys.argv:
+      v = sys.argv.index( '--interface' )
+      assert( len(sys.argv) > v+1 )
+      serverInterfaceName = sys.argv.pop(v+1)
+      sys.argv.pop(v)
 
    if len(sys.argv) == 1:
       return host, None # server takes no args
@@ -765,6 +781,11 @@ if __name__ == '__main__':
    serverName, fsList = parseArgs( host )
    readSecret()
    if host == serverName:
+      if serverInterfaceName != None:
+          serverName = serverInterfaceName
       serverCode( serverName, port ) # server recv code
    else:
+      if serverInterfaceName != None:
+         print 'error: --interface is an option for the server only'
+         usage()
       clientCode( serverName, port, fsList ) # client send code
