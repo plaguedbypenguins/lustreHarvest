@@ -46,7 +46,7 @@ lustreHarvest transparently handles client and server process disconnections and
 Setup
 -----
 
-setup is as simple as editing the script to include your filesystem names so that they can be mapped into ganglia names, and then running the daemons (as root).
+setup is as simple as editing the script to include your filesystem names so that they can be mapped into ganglia names, and then running the daemons as in the example above (as root).
 
 also the secret file will need to be setup to ensure secure and authenticated data transmission. by default this is ''/root/.lustreHarvest.secret'' and needs to have the same contents (which can be whatever you like) on all machines that run lustreHarvest. the file should be readable only by root.
 
