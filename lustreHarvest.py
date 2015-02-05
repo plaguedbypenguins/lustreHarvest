@@ -18,7 +18,7 @@
 # or MDTs eg.
 #   /proc/fs/lustre/{mds,mdt}/data-MDT0000/exports/10.1.14.1@o2ib/stats
 
-import os, socket, select, sys, cPickle, time, subprocess, md5
+import os, socket, select, sys, cPickle, time, subprocess, hashlib
 
 port = 8022  # default port
 clientSend = 3  # number of gathers per minute on clients
@@ -579,7 +579,7 @@ def serverCode( serverName, port ):
                   try:
                      # see client section for the fields in the data header
                      hashh = data[96:128]
-                     if hashh != md5.new(data[:96] + secretText).hexdigest():
+                     if hashh != hashlib.md5(data[:96] + secretText).hexdigest():
                         print >>sys.stderr, 'corrupted header. skipping. hashes do not match', data[:96], hashh
                         continue
                      hashb = data[64:96]
@@ -604,7 +604,7 @@ def serverCode( serverName, port ):
                   try:
                      # done!
                      # check the hash
-                     hashb = md5.new(o[c]['msg']).hexdigest()
+                     hashb = hashlib.md5(o[c]['msg']).hexdigest()
                      if hashb != o[c]['hash']:
                         print >>sys.stderr, 'message corrupted. hash does not match. resetting'
                         zeroOss(o[c])
@@ -683,7 +683,7 @@ def connectSocket(sp):
 def constructMessage(s):
    """construct header and body of message"""
    b = cPickle.dumps(s)
-   hashb = md5.new(b).hexdigest()
+   hashb = hashlib.md5(b).hexdigest()
 
    # 128 byte header
    # this needs to be a fixed size as messages get aggregated
@@ -700,7 +700,7 @@ def constructMessage(s):
    h = 'header %d' % len(b)
    h += ' '*(64-len(h))   # room in here for more fields if we need it
    h += hashb
-   hashh = md5.new(h + secretText).hexdigest()
+   hashh = hashlib.md5(h + secretText).hexdigest()
    h += hashh
    #print 'h', h[:64], h[64:96], h[96:128], 'len(h)', len(h)
 
