@@ -559,16 +559,18 @@ def serverCode( serverName, port ):
             connection.setblocking(0)
             inputs.append(connection)
             o[str(client_address)] = {'size':-1}
+            #print o.keys()
             # any new client appearing or old client disappearing will screw up rates
             first = 1
          else:
             data = s.recv(102400)
+            c = str(s.getpeername())
             if data:
                # A readable client socket has data
                #print >>sys.stderr, 'received "%s" from %s, size %d' % (data, s.getpeername(), len(data))
                #print >>sys.stderr, 'from %s, size %d' % (s.getpeername(), len(data))
 
-               c = str(s.getpeername())
+               #print 'non-server message', c
                if o[c]['size'] == -1: # new message
                   #print 'new msg'
                   if len(data) < 128:
@@ -578,11 +580,11 @@ def serverCode( serverName, port ):
                      # see client section for the fields in the data header
                      hashh = data[96:128]
                      if hashh != md5.new(data[:96] + secretText).hexdigest():
-                        print >>sys.stderr, 'corrupted header. skipping. hashes do not match'
+                        print >>sys.stderr, 'corrupted header. skipping. hashes do not match', data[:96], hashh
                         continue
                      hashb = data[64:96]
                      n = int(data[:64].strip().split()[1])
-                     #print 'header', data[:128], 'size', n
+                     #print 'header', data[:96], data[96:128], 'size', n
                      o[c]['size'] = n
                      o[c]['hash'] = hashb
                      o[c]['msg'] = data[128:]
@@ -595,47 +597,48 @@ def serverCode( serverName, port ):
                   #print 'more. cnt', o[c]['cnt'], 'max', o[c]['size']
                   o[c]['msg'] += data
                   o[c]['cnt'] += len(data)
-                  if o[c]['cnt'] == o[c]['size']: # all there?
-                     #print 'all done'
-                     try:
-                        # done!
-                        # check the hash
-                        hashb = md5.new(o[c]['msg']).hexdigest()
-                        if hashb != o[c]['hash']:
-                           print >>sys.stderr, 'message corrupted. hash does not match. resetting'
-                           zeroOss(o[c])
-                           continue
-                        # data is not corrupted. unpack
-                        o[c]['data'] = cPickle.loads(o[c]['msg'])
 
-                        # shimmy the datatype up from data dict to the oss level
-                        # leaving just fs data in the (non-relay) data
-                        o[c]['dataType'] = o[c]['data']['dataType']
-                        del o[c]['data']['dataType']
+               if o[c]['cnt'] == o[c]['size']: # all there?
+                  #print 'all done'
+                  #print >>sys.stderr, 'got all from %s, size %d. checking & unpacking' % (s.getpeername(), o[c]['size'])
+                  try:
+                     # done!
+                     # check the hash
+                     hashb = md5.new(o[c]['msg']).hexdigest()
+                     if hashb != o[c]['hash']:
+                        print >>sys.stderr, 'message corrupted. hash does not match. resetting'
+                        zeroOss(o[c])
+                        continue
+                     # data is not corrupted. unpack
+                     o[c]['data'] = cPickle.loads(o[c]['msg'])
 
-                        t = time.time()
-                        o[c]['time'] = t
-                        tLast = t
-                        processed = 0
-                        ## debug:
-                        #for i in o[c]['data'].keys():
-                        #   print i, len(o[c]['data'][i])
-                        ## debug:
-                        #j = 0
-                        #for i in o.keys():
-                        #   if 'data' in o[i].keys():
-                        #      j += len(o[i]['data'].keys())
-                        #   else:
-                        #      print 'data not in oss keys of', i, 'keys', o[i].keys()
-                        #print 'oss keys', len(o.keys()), 'ost keys', j
-                     except:
-                        print >>sys.stderr, 'corrupted data from', c
-                     # put the message back into recv mode
-                     # note that 'data' has not yet been processed so must be left alone
-                     zeroOss(o[c])
-                  elif o[c]['cnt'] > o[c]['size']:
-                     print >>sys.stderr, 'too much data. resetting'
-                     zeroOss(o[c])
+                     # shimmy the datatype up from data dict to the oss level
+                     # leaving just fs data in the (non-relay) data
+                     o[c]['dataType'] = o[c]['data']['dataType']
+                     del o[c]['data']['dataType']
+
+                     t = time.time()
+                     o[c]['time'] = t
+                     tLast = t
+                     processed = 0                        ## debug:
+                     #for i in o[c]['data'].keys():
+                     #   print i, len(o[c]['data'][i])
+                     ## debug:
+                     #j = 0
+                     #for i in o.keys():
+                     #   if 'data' in o[i].keys():
+                     #      j += len(o[i]['data'].keys())
+                     #   else:
+                     #      print 'data not in oss keys of', i, 'keys', o[i].keys()
+                     #print 'oss keys', len(o.keys()), 'ost keys', j
+                  except:
+                     print >>sys.stderr, 'corrupted data from', c
+                  # put the message back into recv mode
+                  # note that 'data' has not yet been processed so must be left alone
+                  zeroOss(o[c])
+               elif o[c]['cnt'] > o[c]['size']:
+                  print >>sys.stderr, 'too much data. resetting', o[c]['cnt'], o[c]['size']
+                  zeroOss(o[c])
 
             else:
                # Interpret empty result as closed connection
@@ -699,7 +702,7 @@ def constructMessage(s):
    h += hashb
    hashh = md5.new(h + secretText).hexdigest()
    h += hashh
-   #print 'header len', len(h)
+   #print 'h', h[:64], h[64:96], h[96:128], 'len(h)', len(h)
 
    return h, b
 
