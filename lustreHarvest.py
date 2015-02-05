@@ -639,10 +639,12 @@ def serverCode( serverName, port ):
 
             else:
                # Interpret empty result as closed connection
-               print >>sys.stderr, 'closing', client_address, 'after reading no data'
+               print >>sys.stderr, 'closing', client_address, 'after reading no data.'
                # Stop listening for input on the connection
                inputs.remove(s)
                s.close()
+               # delete all the data from that oss too
+               del o[c]
                # any new client appearing or old client disappearing will screw up rates
                first = 1
 
