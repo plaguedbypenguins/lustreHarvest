@@ -16,7 +16,7 @@
 # ...
 #
 # or MDTs eg.
-#   /proc/fs/lustre/mds/data-MDT0000/exports/10.1.14.1@o2ib/stats
+#   /proc/fs/lustre/{mds,mdt}/data-MDT0000/exports/10.1.14.1@o2ib/stats
 
 import os, socket, select, sys, cPickle, time, subprocess, md5
 
@@ -42,9 +42,12 @@ localLnets = { 'vu':'o2ib', 'xe':'o2ib2', 'dcc':'tcp102' }
 # specify which clusters to relay to
 relay = { 'alkindi': [ 'vu', 'xe', 'dcc' ] }
 
-statsDir = { 'oss':'/proc/fs/lustre/obdfilter', 'mds':'/proc/fs/lustre/mds' }
+# stats file locations on oss/mds. handle v1.8 and 2.5
+statsDir = { 'oss':['/proc/fs/lustre/obdfilter'], 'mds':['/proc/fs/lustre/mds', '/proc/fs/lustre/mdt'] }
+
 verbose = 0
 dryrun = 0
+
 # shared secret between client and servers. only readable by root
 secretFile = '/root/.lustreHarvest.secret'
 
@@ -156,27 +159,29 @@ def gatherStats(fs):
    s = {}
    osts = []
    # handle both mds and oss
-   for machType, ld in statsDir.iteritems():
-      try:
-         dirs = os.listdir(ld)
-      except:
-         continue
-      # find osts
-      for d in dirs:
-         if d[:len(fs)] == fs:
-            osts.append(d)
-      for o in osts:
-         s[o] = {}
-         s[o]['type'] = machType   # oss or mds data
-         ostDir = ld + '/' + o + '/exports'
-         # loop over all clients
-         for c in os.listdir(ostDir):
-            #print c
-            try:
-               s[o][c] = readStatsFile(ostDir + '/' + c + '/stats')
-               #print s[o][c]
-            except:
-               pass
+   for machType, lld in statsDir.iteritems():
+      for ld in lld:  # loop over possible stats dirs looking for fsName-*
+         try:
+            dirs = os.listdir(ld)
+         except:
+            continue
+         # find osts
+         for d in dirs:
+            if d[:len(fs)] == fs and len(d) > len(fs) and d[len(fs)] == '-':
+               osts.append((machType, ld, d))
+
+   for machType, ld, o in osts:
+      s[o] = {}
+      s[o]['type'] = machType   # oss or mds data
+      ostDir = ld + '/' + o + '/exports'
+      # loop over all clients
+      for c in os.listdir(ostDir):
+         #print c
+         try:
+            s[o][c] = readStatsFile(ostDir + '/' + c + '/stats')
+            #print s[o][c]
+         except:
+            pass
    #print s
    return s
 
