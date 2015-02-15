@@ -51,6 +51,10 @@ dryrun = 0
 # shared secret between client and servers. only readable by root
 secretFile = '/root/.lustreHarvest.secret'
 
+gmondHost = '192.168.55.13' # g2 IPoIB # '239.2.11.71'   # multicast address or hostname or ip
+gmondPort = 8650   # 8649
+gmondProtocol = 'udp' # 'multicast'  # 'multicast' or 'udp'
+
 dt = 60.0/clientSend
 hostCache = {}
 secretText = None
@@ -457,7 +461,7 @@ def serverCode( serverName, port ):
    outputs = []
 
    # setup socket to talk to gmond
-   g = gmetric.Gmetric( '239.2.11.71', 8649, 'multicast' )
+   g = gmetric.Gmetric( gmondHost, gmondPort, gmondProtocol )
    ## debug: send to nonsense destination port:
    #g = gmetric.Gmetric( '239.2.11.71', 8659, 'multicast' )
 
