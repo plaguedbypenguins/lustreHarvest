@@ -600,13 +600,13 @@ def serverCode( serverName, port ):
             print >>sys.stderr, 'new connection from', client_address
             connection.setblocking(0)
             inputs.append(connection)
-            o[str(client_address)] = {'size':-1}
+            o[client_address] = {'size':-1}
             #print o.keys()
             # any new client appearing or old client disappearing will screw up rates
             first = 1
          else:
             data = s.recv(102400)
-            c = str(s.getpeername())
+            c = s.getpeername()
             if data:
                # A readable client socket has data
                #print >>sys.stderr, 'received "%s" from %s, size %d' % (data, s.getpeername(), len(data))
