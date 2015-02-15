@@ -140,10 +140,10 @@ def computeRates( sOld, s, tOld, t ):
    return rates, err
 
 def readStatsFile(fn):
-   l = open(fn,'r').readlines()
    # turn into a dict
+   f = open(fn, 'r')
    i = {}
-   for ll in l:
+   for ll in f:
       j = ll.split()
       i[j[0]] = j[1:]
    # ignore snapshot_time and ping, but harvest and sum all the other [reqs] and call them iops
