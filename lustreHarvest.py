@@ -83,6 +83,7 @@ def spoofIntoGanglia(g, o, name, unit):
          #print >>sys.stderr, 'unknown host', i, ip
          continue
       spoofStr = ip + ':' + host
+      #print 'g.send(', name, '%.2f', d, 'float', unit, 'both', 60, 0, '', spoofStr, ')'
       g.send( name, '%.2f' % d, 'float', unit, 'both', 60, 0, "", spoofStr )
 
 def readSecret():
@@ -271,7 +272,7 @@ def sumDataToClients(o, t):
       c.remove('type')
    if verbose:
       #print 'clients', len(c)
-      print 'oss', len(o.keys()), 'ost', Nost, 'clients', len(c), 'filesystems', fss
+      print 'oss/mds', len(o.keys()), 'ost/mdt', Nost, 'clients', len(c), 'filesystems', fss
       #print 'client list', time.time() - t
 
    # make zero'd client lists
@@ -417,7 +418,6 @@ def printRate(s,o):
       j += o[i]
    print s, j
 
-
 def doRelaySend(rs, host, port, d):
    # bundle all data up into a message of dataType 'relay' and
    # send to other clusters. return connections also so we
@@ -465,7 +465,6 @@ def doRelaySend(rs, host, port, d):
 #    but this is necessary in the 'zero knowledge of endpoints' relayer model
 #  - central fs has only remote clients so most info it gathers is useful only for remote clusters.
 #    however one meaningful number is the per oss data that could be dropped into central fs's ganglia
-
 
 def serverCode( serverName, port ):
    import gmetric
