@@ -147,17 +147,19 @@ def readStatsFile(fn):
       j = ll.split()
       i[j[0]] = j[1:]
    # ignore snapshot_time and ping, but harvest and sum all the other [reqs] and call them iops
-   ops = 0
+   ops = None
    for n,j in i.iteritems():
       if len(j) < 3 or n in ( 'read_bytes', 'write_bytes', 'snapshot_time', 'ping' ):
          continue
       if j[2] == '[reqs]':
+         if ops == None:
+            ops = 0
          ops += int(j[0])
    # do read and write
-   r = 0
+   r = None
    if 'read_bytes' in i.keys():  # only populated in stats file if used
       r = int(i['read_bytes'][5])
-   w = 0
+   w = None
    if 'write_bytes' in i.keys():
       w = int(i['write_bytes'][5])
    return ( r, w, ops )
@@ -184,11 +186,33 @@ def gatherStats(fs):
       # loop over all clients
       for c in os.listdir(ostDir):
          #print c
+         r, w, ops = None, None, None
          try:
-            s[o][c] = readStatsFile(ostDir + '/' + c + '/stats')
-            #print s[o][c]
+            r, w, ops = readStatsFile(ostDir + '/' + c + '/stats')
          except:
             pass
+
+         # don't report null osts
+         if (r, w, ops) == (None, None, None):
+            continue
+
+         # we don't want to report oss<->oss or mds<->oss or mds<->mds traffic
+         #   mds->oss has snapshot_time only,
+         #      which is covered by the above None,None,None case.
+         #   oss->{oss,mds} has no read_bytes or write_bytes in it.
+         #      it may have eg. create/destry/setattr iops but we don't care.
+         if machType == 'oss' and r == None and w == None:
+            continue
+
+         if r == None:
+            r = 0
+         if w == None:
+            w = 0
+         if ops == None:
+            ops = 0
+
+         s[o][c] = (r, w, ops)
+         #print s[o][c]
    #print s
    return s
 
