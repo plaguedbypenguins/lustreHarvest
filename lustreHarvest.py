@@ -105,8 +105,9 @@ def readSecret():
    secretText = str(l)
 
 def computeRates( sOld, s, tOld, t ):
+   err = 0
    if len(s) == 0:  # no data for this fs
-      return {}
+      return {}, err
    deltat = t - tOld
    rates = {}
 
@@ -120,9 +121,10 @@ def computeRates( sOld, s, tOld, t ):
          ds = s[h] - sOld[h]
          if ds < 0:
             print >>sys.stderr, 'negative rate', h, ds, s[h], sOld[h]
+            err = 1
             ds = 0
          rates[h] = float(ds)/deltat
-      return rates
+      return rates, err
 
    # if clients have changed (always added, never removed?) then do the full much slower loop
    for h in s.keys():
@@ -130,11 +132,12 @@ def computeRates( sOld, s, tOld, t ):
          ds = s[h] - sOld[h]
          if ds < 0:
             print >>sys.stderr, 'clients changed. negative rate', h, ds, s[h], sOld[h]
+            err = 1
             ds = 0
          rates[h] = float(ds)/deltat
       else:
          rates[h] = 0.0
-   return rates
+   return rates, err
 
 def readStatsFile(fn):
    l = open(fn,'r').readlines()
@@ -514,8 +517,11 @@ def serverCode( serverName, port ):
 
              # remove data fields to avoid re-processing data from stopped oss's. not necessary??
              removeProcessedData(o)
+
              if fss != fssOld:
                 first = 1
+
+             err = 0
              if not first:
                 if verbose:
                    print 'rate dt', tLast - tOld
@@ -523,10 +529,15 @@ def serverCode( serverName, port ):
                    if verbose:
                       print 'fs', f
                    t = time.time()
-                   rRate[f] = computeRates( rOld[f], r[f], tOld, tLast )
-                   wRate[f] = computeRates( wOld[f], w[f], tOld, tLast )
-                   ossOpsRate[f] = computeRates( ossOpsOld[f], ossOps[f], tOld, tLast )
-                   mdsOpsRate[f] = computeRates( mdsOpsOld[f], mdsOps[f], tOld, tLast )
+                   rRate[f], err1 = computeRates( rOld[f], r[f], tOld, tLast )
+                   wRate[f], err2 = computeRates( wOld[f], w[f], tOld, tLast )
+                   ossOpsRate[f], err3 = computeRates( ossOpsOld[f], ossOps[f], tOld, tLast )
+                   mdsOpsRate[f], err4 = computeRates( mdsOpsOld[f], mdsOps[f], tOld, tLast )
+
+                   # err indicates a negative rate. likely an ost/mdt failover or oss/mds reboot
+                   fsErr = err1 or err2 or err3 or err4
+                   err = err or fsErr
+
                    tRate = time.time() - t
                    t = time.time()
                    if verbose:
@@ -539,18 +550,22 @@ def serverCode( serverName, port ):
                       printRate('ossOpsRate', ossOpsRate[f])
                       printRate('mdsOpsRate', mdsOpsRate[f])
 
-                   fsGangliaName = nameMap[f]
-                   spoofIntoGanglia(g,      rRate[f], fsGangliaName + '_read_bytes',  'bytes/sec')
-                   spoofIntoGanglia(g,      wRate[f], fsGangliaName + '_write_bytes', 'bytes/sec')
-                   spoofIntoGanglia(g, ossOpsRate[f], fsGangliaName + '_oss_ops',     'ops/sec')
-                   spoofIntoGanglia(g, mdsOpsRate[f], fsGangliaName + '_mds_ops',     'ops/sec')
-                   if verbose:
-                      print 'spoof into ganglia time', time.time() - t
+                   if not fsErr:
+                      fsGangliaName = nameMap[f]
+                      spoofIntoGanglia(g,      rRate[f], fsGangliaName + '_read_bytes',  'bytes/sec')
+                      spoofIntoGanglia(g,      wRate[f], fsGangliaName + '_write_bytes', 'bytes/sec')
+                      spoofIntoGanglia(g, ossOpsRate[f], fsGangliaName + '_oss_ops',     'ops/sec')
+                      spoofIntoGanglia(g, mdsOpsRate[f], fsGangliaName + '_mds_ops',     'ops/sec')
+                      if verbose:
+                         print 'spoof into ganglia time', time.time() - t
 
              if verbose:
                 print
              tOld = tLast
              first = 0
+             if err:
+                print >>sys.stderr, 'negative rate found. resetting all rates.'
+                first = 1
              processed = 1
          continue
 
